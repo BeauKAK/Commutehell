@@ -1,0 +1,338 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Commute Countdown</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🐱</text></svg>">
+<style>
+:root{
+  --bg1:#ffe6f2;  /* light pink */
+  --bg2:#fff5fb;  /* very light pink */
+  --card:#ffffff;
+  --accent:#ff6fa5; /* hot pink */
+  --accent2:#ff9fc3;/* soft pink */
+  --checked:#ffd1e6;/* pale rose */
+  --text:#3a2a2a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji', 'Segoe UI Symbol';
+  color:var(--text);
+  background: radial-gradient(ellipse at top, var(--bg1), var(--bg2));
+  min-height:100vh;
+}
+header{
+  padding:14px 12px;
+  position:sticky; top:0; z-index:10;
+  background: linear-gradient(90deg, var(--bg1), var(--bg2));
+  border-bottom:1px solid #f3c8db;
+}
+h1{ margin:0; font-size:1.4rem; }
+#remaining{ font-weight:600; margin-top:6px; }
+.wrapper{ padding:10px; display:flex; flex-wrap:wrap; justify-content:center; gap:12px; }
+.month{
+  width: min(340px, 92vw);
+  background: var(--card);
+  border-radius:16px;
+  box-shadow: 0 8px 24px rgba(255,111,165,0.18);
+  padding:12px;
+  border:1px solid #ffd4e6;
+}
+.month h2{
+  margin:6px 0 10px; font-size:1.1rem;
+  color:#a22557; text-align:center;
+}
+.grid{
+  display:grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap:6px;
+  padding:4px;
+}
+.weekday{
+  font-size:.75rem; opacity:.7; text-align:center;
+}
+.cell{
+  aspect-ratio: 1/1;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:10px;
+  background:#ffe6f2;
+  border:1px solid #ffd3e3;
+  user-select:none;
+  transition: transform .06s ease, background .2s ease;
+}
+.cell.clickable{
+  cursor:pointer;
+  background: linear-gradient(180deg, #ffe2f0, #ffd3e8);
+}
+.cell.clickable:hover{ transform: translateY(-1px); }
+.cell.checked{
+  background: var(--checked);
+  border-color:#ffbfd8;
+  text-decoration: line-through;
+}
+.legend{ font-size:.8rem; opacity:.8; text-align:center; margin-top:6px; }
+.footer-actions{ text-align:center; padding:10px 0 20px; }
+button.reset{
+  background: var(--accent);
+  color:white; border:none; border-radius:999px;
+  padding:10px 16px; font-size:.95rem; font-weight:600;
+  box-shadow: 0 6px 16px rgba(255,111,165,.35);
+}
+button.reset:active{ transform: translateY(1px); }
+
+/* Cute cat popup */
+.cat-pop{
+  position: fixed;
+  left: 50%; top: 55%;
+  transform: translate(-50%, -50%) scale(0.9);
+  font-size: 64px;
+  opacity: 0;
+  pointer-events:none;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.15));
+  animation: pop 900ms ease forwards;
+}
+@keyframes pop{
+  0%{ opacity:0; transform: translate(-50%,-50%) scale(.7) rotate(-8deg); }
+  35%{ opacity:1; transform: translate(-50%,-56%) scale(1.05) rotate(4deg); }
+  70%{ opacity:1; transform: translate(-50%,-58%) scale(1) rotate(0deg); }
+  100%{ opacity:0; transform: translate(-50%,-64%) scale(.85) rotate(0deg); }
+}
+
+/* PWA-ish full screen look when saved to Home Screen */
+@media (display-mode: standalone) {
+  header{ padding-top:20px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Commute Countdown 🩷</h1>
+  <div id="remaining">Remaining days: …</div>
+</header>
+
+<div class="wrapper" id="calendarWrapper"></div>
+
+<div class="footer-actions">
+  <button class="reset" id="resetBtn">Reset ticks</button>
+  <div class="legend">Tap a pink square to celebrate a commute 🎉🐱</div>
+</div>
+
+<!-- Confetti -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+// --- DATA FROM PYTHON ---
+const dateList = [
+  '2025-08-12',
+  '2025-08-14',
+  '2025-08-18',
+  '2025-08-20',
+  '2025-08-25',
+  '2025-08-27',
+  '2025-09-01',
+  '2025-09-03',
+  '2025-09-04',
+  '2025-09-08',
+  '2025-09-10',
+  '2025-09-11',
+  '2025-09-15',
+  '2025-09-17',
+  '2025-09-18',
+  '2025-09-22',
+  '2025-09-24',
+  '2025-09-25',
+  '2025-09-29',
+  '2025-10-01',
+  '2025-10-02',
+  '2025-10-13',
+  '2025-10-15',
+  '2025-10-16',
+  '2025-10-20',
+  '2025-10-22',
+  '2025-10-23',
+  '2025-10-28',
+  '2025-10-29',
+  '2025-10-30',
+  '2025-11-03',
+  '2025-11-05',
+  '2025-11-06',
+  '2025-11-10',
+  '2025-11-12',
+  '2025-11-13',
+  '2025-11-17',
+  '2025-11-19',
+  '2025-11-20',
+  '2025-11-24',
+  '2025-11-26',
+  '2025-11-27',
+  '2025-12-01',
+  '2025-12-03',
+  '2025-12-04',
+  '2025-12-08',
+  '2025-12-10',
+  '2025-12-11',
+  '2025-12-15',
+  '2025-12-17',
+  '2025-12-18',
+  '2025-12-22',
+  '2026-01-05',
+  '2026-01-07',
+  '2026-01-08',
+  '2026-01-12',
+  '2026-01-14',
+  '2026-01-15',
+
+];
+
+// Group by month
+function groupByMonth(dates){
+  const groups = {};
+  dates.forEach(iso => {
+    const d = new Date(iso+'T00:00:00');
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+  return groups;
+}
+
+// Get start day offset for grid
+function firstDayOfMonth(year, month){ // month 0-11
+  return new Date(year, month, 1).getDay(); // 0=Sun
+}
+function daysInMonth(year, month){
+  return new Date(year, month+1, 0).getDate();
+}
+
+// State persistence
+const STORAGE_KEY = 'commute_checked_dates_v2';
+let checked = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(checked)));
+}
+
+function updateRemaining(){
+  const remaining = dateList.length - checked.size;
+  document.getElementById('remaining').textContent = `Remaining days: ${remaining}`;
+}
+
+function spawnCat(){
+  const cat = document.createElement('div');
+  cat.className = 'cat-pop';
+  cat.textContent = '🐱✨';
+  document.body.appendChild(cat);
+  setTimeout(()=> cat.remove(), 900);
+}
+
+function celebrate(){
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 }
+  });
+  spawnCat();
+}
+
+function render(){
+  const wrapper = document.getElementById('calendarWrapper');
+  wrapper.innerHTML = '';
+  const groups = groupByMonth(dateList);
+
+  Object.keys(groups).sort().forEach(key => {
+    const [y,m] = key.split('-').map(Number);
+    const monthDates = groups[key].sort((a,b)=>a-b);
+
+    // Build a 7-col grid calendar only showing our dates as clickable cells
+    const monthEl = document.createElement('div');
+    monthEl.className = 'month';
+    const h2 = document.createElement('h2');
+    const monthName = new Date(y, m-1, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+    h2.textContent = monthName;
+    monthEl.appendChild(h2);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+
+    // Weekday labels
+    const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    labels.forEach(l => {
+      const lbl = document.createElement('div');
+      lbl.className = 'weekday';
+      lbl.textContent = l;
+      grid.appendChild(lbl);
+    });
+
+    // Build calendar cells: we draw the whole month but only mark our dates clickable
+    const dim = daysInMonth(y, m-1);
+    const firstDow = firstDayOfMonth(y, m-1); // 0=Sun
+    const totalCells = 7 + Math.ceil((firstDow + dim) / 7) * 7; // header + full weeks
+
+    // Map our clickable dates for quick lookup (by day number)
+    const clickable = new Map();
+    monthDates.forEach(d => {
+      clickable.set(d.getDate(), d.toISOString().slice(0,10));
+    });
+
+    // Fill header row already added (7), now fill day cells
+    const startOffset = firstDow; // how many blanks before day 1
+    let dayNum = 1;
+    for(let i=0; i<Math.ceil((startOffset + dim)/7)*7; i++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      if(i >= startOffset && dayNum <= dim){
+        cell.textContent = dayNum;
+        const iso = clickable.get(dayNum);
+        if(iso){
+          cell.classList.add('clickable');
+          if(checked.has(iso)) cell.classList.add('checked');
+          cell.addEventListener('click', () => {
+            if(!checked.has(iso)){
+              checked.add(iso);
+              cell.classList.add('checked');
+              saveState();
+              updateRemaining();
+              celebrate();
+            } else {
+              // allow uncheck if needed
+              checked.delete(iso);
+              cell.classList.remove('checked');
+              saveState();
+              updateRemaining();
+            }
+          });
+        } else {
+          // non-commute day: softer background
+          cell.style.background = '#fff7fb';
+        }
+        dayNum++;
+      } else {
+        // leading/trailing blanks
+        cell.style.visibility = 'hidden';
+      }
+      grid.appendChild(cell);
+    }
+
+    monthEl.appendChild(grid);
+    wrapper.appendChild(monthEl);
+  });
+
+  updateRemaining();
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if(confirm('Reset all checked days?')){
+    checked = new Set();
+    saveState();
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
